@@ -1,0 +1,36 @@
+#!/bin/bash
+
+echo 'Copying this script into tmp dir'
+rm -rf tmp
+mkdir -p tmp/{bin,tezos}
+cp $BASH_SOURCE ./tmp/bin
+
+echo 'Pulling latest alphanet image'
+docker pull tezos/tezos:alphanet
+docker rm -f dummy-alpha
+echo 'Starting dummy-alpha'
+docker run --name dummy-alpha -d --entrypoint "" tezos/tezos:alphanet sh -c 'while true; do sleep 1; done'
+
+git checkout master
+git clean -f
+git pull
+
+echo 'Copying code from container'
+docker cp dummy-alpha:/home/tezos ./tmp
+docker rm -f dummy-alpha
+
+alphanet_version=$(cat tmp/tezos/scripts/alphanet_version)
+git checkout -b ${alphanet_version}
+git reset --hard master
+cp -r tmp/tezos/* ./
+
+rm -rf bin
+
+git add .
+git commit -m 'Sync code with container'
+
+cp -r tmp/bin ./
+git add bin
+git commit -m 'Add update_code script'
+
+git push -f -u bodymindarts ${alphanet_version}
